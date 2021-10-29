@@ -18,11 +18,7 @@ async def hello():
         await websocket.send(json.dumps(slice))
 
         frame = await websocket.recv()
-        print(f"received from manager: {frame}")
-        await websocket.send("hello again")
-        frame = await websocket.recv()
-        print(f"received from manager again: {frame}")
         # greeting = await asyncio.wait_for(websocket.recv(),timeout=70)
-        # image = Image.frombytes("L",(600,600),frame)
-        # image.show("Slice")
+        image = Image.frombytes("L",(600,600),frame)
+        image.show("Slice")
 asyncio.run(hello())
