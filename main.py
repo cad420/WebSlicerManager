@@ -1,27 +1,28 @@
-# This is a sample Python script.
 
-# Press Shift+F10 to execute it or replace it with your code.
-# Press Double Shift to search everywhere for classes, files, tool windows, actions, and settings.
+import dearpygui.dearpygui as dpg
+from dearpygui.demo import show_demo
 
-import asyncio
+def save_callback():
+    print("Save Clicked")
 
-def print_hi(name):
-    # Use a breakpoint in the code line below to debug your script.
-    print(f'Hi, {name}')  # Press Ctrl+F8 to toggle the breakpoint.
-
-
-# Press the green button in the gutter to run the script.
 if __name__ == '__main__':
-    print_hi('PyCharm')
-    l=dict()
-    l[1]=2;
-    l[3]=2
-    for item in l.items():
-        item[1]=3
-        print(item[0],item[1])
-    s = "/slice/1"
-    info = s.strip('/').split('/')
-    print(info)
-    l=list()
+    dpg.create_context()
+    dpg.create_viewport()
+    dpg.setup_dearpygui()
+    dpg.add_texture_registry(label="Slice Texture Container", tag="slice_texture_container")
+    dpg_image = []
+    for i in range(0, 600):
+        for j in range(0, 600):
+            dpg_image.append(1)
+            dpg_image.append(0)
+            dpg_image.append(1)
+            dpg_image.append(1)
+    dpg.add_dynamic_texture(600, 600, dpg_image, parent="slice_texture_container", tag="slice_texture")
+    with dpg.window(label="Slice View",width=700,height=700):
+        # dpg.add_text("hello")
+        dpg.draw_image("slice_texture", [0, 0], [600, 600])
+    dpg.show_viewport()
+    dpg.start_dearpygui()
+    dpg.destroy_context()
 
-# See PyCharm help at https://www.jetbrains.com/help/pycharm/
+
