@@ -14,7 +14,7 @@ class Manager:
     clients = dict()  # id : (websocket,type)
     worker_clients = dict()  # worker id : [client id...]
     client_worker = dict()  # client id : worker id
-    cv = asyncio.Condition()
+
     def __init__(self):
         logging.info("Manager init")
 
@@ -29,8 +29,6 @@ class Manager:
         self.workers[worker_id] = (worker, info[0], cap)
         assert (worker_id not in self.worker_clients.keys())
         self.worker_clients[worker_id] = list()
-        await self.cv.acquire()
-        self.cv.notify(cap)
 
     def register_client(self,client_id,client,path:str):
         logging.info("register a connected client")
@@ -51,24 +49,25 @@ class Manager:
     def get_client_type(self, client_id):
         return self.clients[client_id][1]
 
-    async def assign_worker_to_client(self, client_id:str):
+    async def assign_worker_to_client(self, client_id:str)->bool:
         """
 
         :param client_id:
         :return: no return
         """
         logging.info("assign a worker from self.workers to a client")
-        while True:
-            for item in self.worker_clients.items():
-                worker_id = item[0]
-                cur_work_num = len(item[1])
-                if self.get_client_type(client_id) == self.get_worker_type(
-                        worker_id) and cur_work_num < self.get_worker_cap(worker_id):
-                    self.worker_clients[worker_id].append(client_id)
-                    self.client_worker[client_id] = worker_id
-                    return
-            await self.cv.acquire()
-            await self.cv.wait()
+
+        for item in self.worker_clients.items():
+            worker_id = item[0]
+            cur_work_num = len(item[1])
+            if self.get_client_type(client_id) == self.get_worker_type(
+                    worker_id) and cur_work_num < self.get_worker_cap(worker_id):
+                self.worker_clients[worker_id].append(client_id)
+                self.client_worker[client_id] = worker_id
+                logging.info(f"assign worker {worker_id} to client {client_id}")
+                return True
+        return False
+
 
     def delete_worker(self, worker_id):
         logging.info(f"delete worker {worker_id}")
@@ -81,8 +80,10 @@ class Manager:
 
     def delete_client(self, client_id):
         logging.info(f"delete client {client_id}")
-        self.clients.pop(client_id)
-        self.client_worker.pop(client_id)
+        if client_id in self.clients:
+            self.clients.pop(client_id)
+        if client_id in self.client_worker.keys():
+            self.client_worker.pop(client_id)
         for item in self.worker_clients.items():
             if client_id in item[1]:
                 self.worker_clients[item[0]].remove(client_id)
@@ -108,9 +109,6 @@ class Manager:
                                     ping_interval=60,ping_timeout=60):
             await asyncio.Future()
 
-    async def serve(self):
-        logging.info("Manager::serve start")
-
     async def handle_client_connect(self, websocket, path):
         logging.info("Manager::handle_client_connect")
         logging.info(f"client connection id: {websocket.id}")
@@ -118,21 +116,22 @@ class Manager:
         try:
             client_id = websocket.id
             self.register_client(client_id, websocket, path)
-            await self.assign_worker_to_client(client_id)
+            if not await self.assign_worker_to_client(client_id):
+                await websocket.send("No valid worker")
+                await websocket.close()
+                self.delete_client(websocket.id)
+                return
             worker = self.get_worker_by_clientID(client_id)
             while True:
                 client_msg = await websocket.recv()
                 logging.info(f"clinet message: {client_msg}")
-                while worker is None:
-                    await self.assign_worker_to_client(client_id)
-                    worker = self.get_worker_by_clientID(client_id)
                 await worker.send(client_msg)
                 frame = await worker.recv()
                 await websocket.send(frame)
         except websockets.exceptions.ConnectionClosed:
             logging.info(f"websocket connection {websocket.id} closed")
         finally:
-            self.clients.pop(websocket.id)
+            self.delete_client(websocket.id)
 
     async def handle_worker_message(self,websocket):
         logging.info("Manager::handle_worker_message")
@@ -144,7 +143,6 @@ class Manager:
         await websocket.wait_closed()
         self.delete_worker(websocket.id)
 
-
     async def process(self, websocket, path):
         logging.info("Manager::process new connection")
         if path[0:4] == '/rpc':
@@ -153,42 +151,6 @@ class Manager:
         elif path[0:7] == '/worker':
             logging.info("worker connect to mananger")
             await self.handle_worker_connect(websocket, path[7:])
-
-
-async def client_t(msg: str, handler):
-    uri = "ws://127.0.0.1:16689/rpc/slice"
-    async with websockets.connect(uri, ping_interval=70) as websocket:
-        await websocket.send(msg)
-        # print(f">>> {name}")
-
-        greeting = await websocket.recv()
-        # greeting = await asyncio.wait_for(websocket.recv(),timeout=70)
-        print(type(greeting))
-
-        handler(greeting)
-        return
-
-
-async def serve_t(websocket, path):
-    if path[0:4] == '/rpc':
-        print("client connect to manager")
-    elif path == '/worker':
-        print("backend worker connect to manager")
-
-    name = await websocket.recv()
-    print(f"manager receive request from client: {name}")
-    greeting = list()
-
-    def handler(msg: str):
-        greeting.append(msg)
-
-    await client_t(name, handler)
-    await websocket.send(greeting[0])
-
-
-async def main():
-    async with websockets.serve(serve_t, "localhost", 8765):
-        await asyncio.Future()
 
 
 if __name__ == "__main__":
