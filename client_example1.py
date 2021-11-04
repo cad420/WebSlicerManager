@@ -13,6 +13,7 @@ class Client:
 
     def __init__(self):
         self.uri = "ws://127.0.0.1:16689/rpc/slice"
+        # self.uri = "ws://127.0.0.1:9876/rpc/slice"
         self.ws = None
 
     async def connect(self):
@@ -35,14 +36,18 @@ class Client:
                 dpg_image.append(1)
         dpg.add_dynamic_texture(600, 600, dpg_image, parent="slice_texture_container", tag="slice_texture")
         slice={
-            "params":{"Slice": {"origin": [15000.0, 12000.0, 5000.0, 1.0],
+            "params":{"slice": {"origin": [15000.0, 12000.0, 5000.0, 1.0],
                        "normal": [0.0, 0.0, 1.0, 0.0],
                        "right": [1.0, 0.0, 0.0, 0.0],
                        "up": [0.0, 1.0, 0.0, 0.0],
                        "n_pixels_width": 600,
                        "n_pixels_height": 600,
                        "voxel_per_pixel_width": 3,
-                       "voxel_per_pixel_height": 3}},
+                       "voxel_per_pixel_height": 3},
+                      "d":2,
+                      "depth":0.6,
+                      "direction":1
+                      },
             "method":"render"
         }
 
@@ -51,6 +56,9 @@ class Client:
             await self.ws.send(mpack.pack(slice))
             frame = await self.ws.recv()
             frame = mpack.unpack(frame)
+            if ("error" in frame.keys()):
+                logging.error(frame["error"])
+                return
             image = Image.open(io.BytesIO(frame["result"]["data"]))
             dpg_image = []
             for i in range(0, image.height):
@@ -61,7 +69,7 @@ class Client:
                     dpg_image.append(pixel[2] / 255)
                     dpg_image.append(1)
             dpg.set_value("slice_texture", dpg_image)
-            slice["params"]["Slice"]["origin"][2] = slice["params"]["Slice"]["origin"][2] + 100
+            slice["params"]["slice"]["origin"][2] = slice["params"]["slice"]["origin"][2] + 100
         update_slice_v = False
 
         def set_update_slice():
@@ -79,7 +87,7 @@ class Client:
                 await update_slice()
                 update_slice_v = False
             dpg.render_dearpygui_frame()
-        dpg.cleanup_dearpygui()
+
         dpg.destroy_context()
 
     def __del__(self):
