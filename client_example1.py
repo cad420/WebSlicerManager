@@ -17,7 +17,7 @@ class Client:
         self.ws = None
 
     async def connect(self):
-        async with websockets.connect(self.uri, ping_interval=60) as websocket:
+        async with websockets.connect(self.uri, ping_interval=600) as websocket:
             self.ws = websocket
             logging.info(self.ws.open)
             await self.run()
@@ -45,8 +45,8 @@ class Client:
                        "voxel_per_pixel_width": 3,
                        "voxel_per_pixel_height": 3},
                       "d":2,
-                      "depth":0.6,
-                      "direction":1
+                      "depth":1.2,
+                      "direction":3
                       },
             "method":"render"
         }
@@ -69,17 +69,102 @@ class Client:
                     dpg_image.append(pixel[2] / 255)
                     dpg_image.append(1)
             dpg.set_value("slice_texture", dpg_image)
-            slice["params"]["slice"]["origin"][2] = slice["params"]["slice"]["origin"][2] + 100
+
         update_slice_v = False
 
-        def set_update_slice():
-           nonlocal update_slice_v
-           update_slice_v = True
+        def update_slice_forward():
+            nonlocal update_slice_v
+            update_slice_v = True
+            slice["params"]["slice"]["origin"][2] = slice["params"]["slice"]["origin"][2] + 10
+            dpg.set_value("origin_x", slice["params"]["slice"]["origin"][0])
+            dpg.set_value("origin_y", slice["params"]["slice"]["origin"][1])
+            dpg.set_value("origin_z", slice["params"]["slice"]["origin"][2])
+        def update_slice_backforward():
+            nonlocal update_slice_v
+            update_slice_v = True
+            slice["params"]["slice"]["origin"][2] = slice["params"]["slice"]["origin"][2] - 10
+            dpg.set_value("origin_x", slice["params"]["slice"]["origin"][0])
+            dpg.set_value("origin_y", slice["params"]["slice"]["origin"][1])
+            dpg.set_value("origin_z", slice["params"]["slice"]["origin"][2])
+        def update_slice_zoom_out():
+            nonlocal update_slice_v
+            update_slice_v = True
+            slice["params"]["slice"]["voxel_per_pixel_height"] = slice["params"]["slice"]["voxel_per_pixel_height"] * 1.1
+            slice["params"]["slice"]["voxel_per_pixel_width"] = slice["params"]["slice"]["voxel_per_pixel_width"] * 1.1
+            dpg.set_value("voxels_per_pixel", slice["params"]["slice"]["voxel_per_pixel_width"])
 
-        with dpg.window(label="Slice Viewer", width=600, height=600, no_resize=True, tag="slice_viewer"):
+        def update_slice_zoom_in():
+            nonlocal update_slice_v
+            update_slice_v = True
+            slice["params"]["slice"]["voxel_per_pixel_height"] = slice["params"]["slice"]["voxel_per_pixel_height"] * 0.9
+            slice["params"]["slice"]["voxel_per_pixel_width"] = slice["params"]["slice"]["voxel_per_pixel_width"] * 0.9
+            dpg.set_value("voxels_per_pixel", slice["params"]["slice"]["voxel_per_pixel_width"])
+
+        def update_slice_increase_d():
+            nonlocal update_slice_v
+            update_slice_v = True
+            d = slice["params"]["d"]
+            d = max(0,d + 1)
+            slice["params"]["d"] = d
+            dpg.set_value("slice_d", slice["params"]["d"])
+
+        def update_slice_decrease_d():
+            nonlocal update_slice_v
+            update_slice_v = True
+            d = slice["params"]["d"]
+            d = max(0, d - 1)
+            slice["params"]["d"] = d
+            dpg.set_value("slice_d", slice["params"]["d"])
+
+        def update_slice_increase_depth():
+            nonlocal update_slice_v
+            update_slice_v = True
+            depth = slice["params"]["depth"] + 0.1
+            depth = max(0.0, depth)
+            slice["params"]["depth"] = slice["params"]["depth"] + 0.1
+            dpg.set_value("slice_depth", slice["params"]["depth"])
+
+        def update_slice_decrease_depth():
+            nonlocal update_slice_v
+            update_slice_v = True
+            depth = slice["params"]["depth"] - 0.1
+            depth = max(0.0, depth)
+            slice["params"]["depth"] = depth
+            dpg.set_value("slice_depth", slice["params"]["depth"])
+
+        with dpg.window(label="Information",width=200,height=600,no_resize=True,tag="slice_info"):
+            with dpg.collapsing_header(label="Slice Info",default_open=True):
+                dpg.add_separator()
+                dpg.add_text("origin ",bullet=True,indent=20)
+                dpg.add_input_float(label="x ",readonly=True,tag="origin_x")
+                dpg.add_input_float(label="y ",readonly=True,tag="origin_y")
+                dpg.add_input_float(label="z ",readonly=True,tag="origin_z")
+                dpg.add_separator()
+                dpg.add_text("voxels_per_pixel ",bullet=True,indent=20)
+                dpg.add_input_float(readonly=True,tag="voxels_per_pixel")
+                dpg.add_separator()
+                dpg.add_text("d ",bullet=True,indent=20)
+                dpg.add_input_int(readonly=True,tag="slice_d")
+                dpg.add_separator()
+                dpg.add_text("depth ",bullet=True,indent=20)
+                dpg.add_input_float(readonly=True,tag="slice_depth")
+        dpg.set_value("origin_x", slice["params"]["slice"]["origin"][0])
+        dpg.set_value("origin_y", slice["params"]["slice"]["origin"][1])
+        dpg.set_value("origin_z", slice["params"]["slice"]["origin"][2])
+        dpg.set_value("voxels_per_pixel",slice["params"]["slice"]["voxel_per_pixel_width"])
+        dpg.set_value("slice_d",slice["params"]["d"])
+        dpg.set_value("slice_depth", slice["params"]["depth"])
+        with dpg.window(label="Slice Viewer", width=600, height=600, no_resize=True, tag="slice_viewer",pos=(200,0)):
             dpg.draw_image("slice_texture", [0, 0], [600, 600])
-        with dpg.window(label="Slice Control",width=200,height=600,no_resize=True,tag="slice_control"):
-            dpg.add_button(tag="slice_reload",width=50,height=50,callback=set_update_slice)
+        with dpg.window(label="Slice Control",width=200,height=600,no_resize=True,tag="slice_control",pos=(800,0)):
+            dpg.add_button(tag="slice_reload_forward",width=120,height=50,callback=update_slice_forward,label="forward")
+            dpg.add_button(tag="slice_reload_backward",width =120,height =50,label="backward",callback=update_slice_backforward)
+            dpg.add_button(tag="slice_reload_zoom_out",width=120,height=50,label="zoom out",callback=update_slice_zoom_out)
+            dpg.add_button(tag="slice_reload_zoom_in",width=120,height=50,label="zoom in",callback=update_slice_zoom_in)
+            dpg.add_button(tag="slice_reload_increase_d",width=120,height=50,label="increase d",callback=update_slice_increase_d)
+            dpg.add_button(tag="slice_reload_decrease_d",width=120,height=50,label="decrease d",callback=update_slice_decrease_d)
+            dpg.add_button(tag="slice_reload_increase_depth",width=120,height=50,label="increase depth",callback=update_slice_increase_depth)
+            dpg.add_button(tag="slice_reload_decrease_depth",width=120,height=50,label="decrease depth",callback=update_slice_decrease_depth)
         dpg.show_viewport()
         # dpg.start_dearpygui()
         while(dpg.is_dearpygui_running()):
@@ -95,57 +180,6 @@ class Client:
         logging.info(f"Client is closed {self.ws.closed}")
         logging.info("destructor")
 
-
-async def hello():
-    # uri = "ws://127.0.0.1:9876/rpc/slice" # connect to manager
-    uri = "ws://127.0.0.1:16689/rpc/slice" # connect directly to server
-    ws = None
-    async with websockets.connect(uri,ping_interval=60) as websocket:
-        slice={
-            "params":{"Slice": {"origin": [15000.0, 12000.0, 5000.0, 1.0],
-                       "normal": [0.0, 0.0, 1.0, 0.0],
-                       "right": [1.0, 0.0, 0.0, 0.0],
-                       "up": [0.0, 1.0, 0.0, 0.0],
-                       "n_pixels_width": 600,
-                       "n_pixels_height": 600,
-                       "voxel_per_pixel_width": 3,
-                       "voxel_per_pixel_height": 3}},
-            "method":"render"
-        }
-        # await websocket.ping()
-        try:
-            while True:
-                await websocket.send(mpack.pack(slice))
-                frame = await websocket.recv()
-                frame = mpack.unpack(frame)
-                image = Image.open(io.BytesIO(frame["result"]["data"]))
-                dpg_image = []
-                for i in range(0, image.height):
-                    for j in range(0, image.width):
-                        pixel = image.getpixel((j, i))
-                        dpg_image.append(pixel[0] / 255)
-                        dpg_image.append(pixel[1] / 255)
-                        dpg_image.append(pixel[2] / 255)
-                        dpg_image.append(1)
-                dpg.set_value("slice_texture",dpg_image)
-                slice["params"]["Slice"]["origin"][2] = slice["params"]["Slice"]["origin"][2]+100
-        except websockets.exceptions.ConnectionClosed:
-            logging.info(f"websocket connection {websocket.id} closed")
-        finally:
-            logging.info("websocket connection close")
-        # await websocket.send(mpack.pack(slice))
-        #
-        # frame = await websocket.recv()
-        # frame = mpack.unpack(frame)
-        # print(type(frame))
-        # print(f"received from manager: {frame}")
-        # await websocket.send("hello again")
-        # frame = await websocket.recv()
-        # print(f"received from manager again: {frame}")
-        # greeting = await asyncio.wait_for(websocket.recv(),timeout=70)
-        # image = Image.frombytes("L",(600,600),frame["result"]["data"])
-        # image = Image.open(io.BytesIO(frame["result"]["data"]))
-        # image.show("Slice")
 if __name__ == "__main__":
     logging.basicConfig(format='%(asctime)s %(levelname)s: %(message)s', level=logging.INFO)
     client = Client()
