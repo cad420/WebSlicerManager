@@ -45,8 +45,7 @@ class Client:
                                  "n_pixels_height": 600,
                                  "voxel_per_pixel_width": 3,
                                  "voxel_per_pixel_height": 3},
-                       "d": 2,
-                       "depth": 1.2,
+                       "depth": 0.00032,
                        "direction": 3
                        },
             "method": "render"
@@ -105,34 +104,18 @@ class Client:
             slice["params"]["slice"]["voxel_per_pixel_width"] = slice["params"]["slice"]["voxel_per_pixel_width"] * 0.9
             dpg.set_value("voxels_per_pixel", slice["params"]["slice"]["voxel_per_pixel_width"])
 
-        def update_slice_increase_d():
-            nonlocal update_slice_v
-            update_slice_v = True
-            d = slice["params"]["d"]
-            d = max(0, d + 1)
-            slice["params"]["d"] = d
-            dpg.set_value("slice_d", slice["params"]["d"])
-
-        def update_slice_decrease_d():
-            nonlocal update_slice_v
-            update_slice_v = True
-            d = slice["params"]["d"]
-            d = max(0, d - 1)
-            slice["params"]["d"] = d
-            dpg.set_value("slice_d", slice["params"]["d"])
-
         def update_slice_increase_depth():
             nonlocal update_slice_v
             update_slice_v = True
-            depth = slice["params"]["depth"] + 0.1
+            depth = slice["params"]["depth"] * 1.1
             depth = max(0.0, depth)
-            slice["params"]["depth"] = slice["params"]["depth"] + 0.1
+            slice["params"]["depth"] = depth
             dpg.set_value("slice_depth", slice["params"]["depth"])
 
         def update_slice_decrease_depth():
             nonlocal update_slice_v
             update_slice_v = True
-            depth = slice["params"]["depth"] - 0.1
+            depth = slice["params"]["depth"] * 0.9
             depth = max(0.0, depth)
             slice["params"]["depth"] = depth
             dpg.set_value("slice_depth", slice["params"]["depth"])
@@ -148,16 +131,12 @@ class Client:
                 dpg.add_text("voxels_per_pixel ", bullet=True, indent=20)
                 dpg.add_input_float(readonly=True, tag="voxels_per_pixel")
                 dpg.add_separator()
-                dpg.add_text("d ", bullet=True, indent=20)
-                dpg.add_input_int(readonly=True, tag="slice_d")
-                dpg.add_separator()
                 dpg.add_text("depth ", bullet=True, indent=20)
-                dpg.add_input_float(readonly=True, tag="slice_depth")
+                dpg.add_input_float(readonly=True, tag="slice_depth",format = '%.6f')
         dpg.set_value("origin_x", slice["params"]["slice"]["origin"][0])
         dpg.set_value("origin_y", slice["params"]["slice"]["origin"][1])
         dpg.set_value("origin_z", slice["params"]["slice"]["origin"][2])
         dpg.set_value("voxels_per_pixel", slice["params"]["slice"]["voxel_per_pixel_width"])
-        dpg.set_value("slice_d", slice["params"]["d"])
         dpg.set_value("slice_depth", slice["params"]["depth"])
         with dpg.window(label="Slice Viewer", width=600, height=600, no_resize=True, tag="slice_viewer", pos=(200, 0)):
             dpg.draw_image("slice_texture", [0, 0], [600, 600])
@@ -171,10 +150,6 @@ class Client:
                            callback=update_slice_zoom_out)
             dpg.add_button(tag="slice_reload_zoom_in", width=120, height=50, label="zoom in",
                            callback=update_slice_zoom_in)
-            dpg.add_button(tag="slice_reload_increase_d", width=120, height=50, label="increase d",
-                           callback=update_slice_increase_d)
-            dpg.add_button(tag="slice_reload_decrease_d", width=120, height=50, label="decrease d",
-                           callback=update_slice_decrease_d)
             dpg.add_button(tag="slice_reload_increase_depth", width=120, height=50, label="increase depth",
                            callback=update_slice_increase_depth)
             dpg.add_button(tag="slice_reload_decrease_depth", width=120, height=50, label="decrease depth",
