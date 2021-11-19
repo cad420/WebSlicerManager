@@ -36,6 +36,17 @@ class Client:
                 dpg_image.append(0)
                 dpg_image.append(1)
         dpg.add_dynamic_texture(600, 600, dpg_image, parent="slice_texture_container", tag="slice_texture")
+
+        dpg.add_texture_registry(label="Slice Map Texture Container",tag="slice_map_texture_container")
+        dpg_map_image=[]
+        for i in range(0,300):
+            for j in range(0,300):
+                dpg_map_image.append(0)
+                dpg_map_image.append(0)
+                dpg_map_image.append(0)
+                dpg_map_image.append(1)
+        dpg.add_dynamic_texture(300,300,dpg_map_image,parent="slice_map_texture_container",tag="slice_map_texture")
+
         slice = {
             "params": {"slice": {"origin": [15000.0, 12000.0, 5000.0, 1.0],
                                  "normal": [0.0, 0.0, 1.0, 0.0],
@@ -50,7 +61,13 @@ class Client:
                        },
             "method": "render"
         }
-
+        slice_map = {
+            "params": {"slice": slice["params"]["slice"],
+                       "window_w": 300,
+                       "window_h": 300
+                       },
+            "method": "map"
+        }
         async def update_slice():
             logging.info("call update_slice")
             await self.ws.send(mpack.pack(slice))
@@ -69,6 +86,24 @@ class Client:
                     dpg_image.append(pixel[2] / 255)
                     dpg_image.append(1)
             dpg.set_value("slice_texture", dpg_image)
+
+            await self.ws.send(mpack.pack(slice_map))
+            frame = await self.ws.recv()
+            frame = mpack.unpack(frame)
+            if ("error" in frame.keys()):
+                logging.error(frame["error"])
+                return
+            image = Image.open(io.BytesIO(frame["result"]["data"]))
+            dpg_image = []
+            logging.info(f"{image.width} {image.height}")
+            for i in range(0, image.height):
+                for j in range(0, image.width):
+                    pixel = image.getpixel((j, i))
+                    dpg_image.append(pixel[0] / 255)
+                    dpg_image.append(pixel[1] / 255)
+                    dpg_image.append(pixel[2] / 255)
+                    dpg_image.append(1)
+            dpg.set_value("slice_map_texture", dpg_image)
 
         update_slice_v = False
 
@@ -140,8 +175,9 @@ class Client:
         dpg.set_value("slice_depth", slice["params"]["depth"])
         with dpg.window(label="Slice Viewer", width=600, height=600, no_resize=True, tag="slice_viewer", pos=(200, 0)):
             dpg.draw_image("slice_texture", [0, 0], [600, 600])
-        with dpg.window(label="Slice Control", width=200, height=600, no_resize=True, tag="slice_control",
-                        pos=(800, 0)):
+        with dpg.window(label="Slice Map Viewer",width=300,height=300,no_resize=True,tag="slice_map_view",pos=(800,0)):
+            dpg.draw_image("slice_map_texture",[0,0],[300,300])
+        with dpg.window(label="Slice Control", width=200, height=600, no_resize=True, tag="slice_control",pos=(1100, 0)):
             dpg.add_button(tag="slice_reload_forward", width=120, height=50, callback=update_slice_forward,
                            label="forward")
             dpg.add_button(tag="slice_reload_backward", width=120, height=50, label="backward",
