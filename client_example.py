@@ -39,14 +39,26 @@ class Client:
 
         dpg.add_texture_registry(label="Slice Map Texture Container",tag="slice_map_texture_container")
         dpg_map_image=[]
-        for i in range(0,300):
-            for j in range(0,300):
+        for i in range(0,500):
+            for j in range(0,500):
                 dpg_map_image.append(0)
                 dpg_map_image.append(0)
                 dpg_map_image.append(0)
                 dpg_map_image.append(1)
-        dpg.add_dynamic_texture(300,300,dpg_map_image,parent="slice_map_texture_container",tag="slice_map_texture")
-
+        dpg.add_dynamic_texture(500,500,dpg_map_image,parent="slice_map_texture_container",tag="slice_map_texture")
+        volume = {
+            "params":{},
+            "method":"get"
+        }
+        await self.ws.send(mpack.pack(volume))
+        frame = await self.ws.recv()
+        frame = mpack.unpack(frame)
+        if ("error" in frame.keys()):
+            logging.error(frame["error"])
+        volume_name = frame["result"]["volume_name"]
+        volume_dim = frame["result"]["volume_dim"]
+        volume_space = frame["result"]["volume_space"]
+        logging.info(f"volume name {volume_name}, volume dim {volume_dim}, volume space {volume_space}")
         slice = {
             "params": {"slice": {"origin": [15000.0, 12000.0, 5000.0, 1.0],
                                  "normal": [0.0, 0.0, 1.0, 0.0],
@@ -62,10 +74,7 @@ class Client:
             "method": "render"
         }
         slice_map = {
-            "params": {"slice": slice["params"]["slice"],
-                       "window_w": 300,
-                       "window_h": 300
-                       },
+            "params": {"slice": slice["params"]["slice"]},
             "method": "map"
         }
         async def update_slice():
@@ -175,9 +184,9 @@ class Client:
         dpg.set_value("slice_depth", slice["params"]["depth"])
         with dpg.window(label="Slice Viewer", width=600, height=600, no_resize=True, tag="slice_viewer", pos=(200, 0)):
             dpg.draw_image("slice_texture", [0, 0], [600, 600])
-        with dpg.window(label="Slice Map Viewer",width=300,height=300,no_resize=True,tag="slice_map_view",pos=(800,0)):
-            dpg.draw_image("slice_map_texture",[0,0],[300,300])
-        with dpg.window(label="Slice Control", width=200, height=600, no_resize=True, tag="slice_control",pos=(1100, 0)):
+        with dpg.window(label="Slice Map Viewer",width=500,height=500,no_resize=True,tag="slice_map_view",pos=(800,0)):
+            dpg.draw_image("slice_map_texture",[0,0],[500,500])
+        with dpg.window(label="Slice Control", width=200, height=600, no_resize=True, tag="slice_control",pos=(1300, 0)):
             dpg.add_button(tag="slice_reload_forward", width=120, height=50, callback=update_slice_forward,
                            label="forward")
             dpg.add_button(tag="slice_reload_backward", width=120, height=50, label="backward",
