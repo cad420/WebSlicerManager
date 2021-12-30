@@ -105,7 +105,7 @@ class Manager:
 
     async def listen(self):
         logging.info("Manager::run start")
-        async with websockets.serve(self.process, "localhost", self.port,
+        async with websockets.serve(self.process, "0.0.0.0", self.port,
                                     ping_interval=60,ping_timeout=60):
             await asyncio.Future()
 
